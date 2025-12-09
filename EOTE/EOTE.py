@@ -12,7 +12,56 @@ warnings.filterwarnings("ignore")
 
 
 class EOTE:
+    """Explainable Outlier Tree-based AutoEncoder for anomaly detection.
+
+    EOTE is an anomaly detection system for tabular data that provides interpretable,
+    rule-based explanations for its predictions. It uses a per-feature autoencoding
+    approach where each feature is predicted from all other features using decision trees.
+
+    The algorithm:
+    1. Trains one decision tree per feature to predict that feature from all others
+    2. Calculates normal and anomaly scores based on prediction accuracy
+    3. Provides interpretable decision rules explaining why instances are classified
+       as normal or anomalous
+
+    Attributes:
+        class_verification_method: Verifies dataset has single class (semi-supervised)
+        attribute_remover: Removes attributes with insufficient categorical values
+        imputer: Handles missing data imputation (e.g., MissForest)
+        encoder: Encodes categorical features (e.g., OneHotEncoder)
+        path_shortener: Simplifies decision tree paths for readability
+        cat_feature_tree_director: Director for building categorical feature trees
+        cat_feature_tree_builder: Builder for categorical feature trees
+        num_feature_tree_director: Director for building numerical feature trees
+        num_feature_tree_builder: Builder for numerical feature trees
+        output_formatting: Formatter for classification results output
+
+    Note:
+        EOTE should be constructed using the Builder pattern via EOTEDirector,
+        not directly instantiated. See example_terminal_output.py for usage.
+
+    Example:
+        >>> from EOTE.Directors import EOTEDirector
+        >>> from EOTE.Builders import EoteWithMissForestInTerminalBuilder
+        >>>
+        >>> director = EOTEDirector(EoteWithMissForestInTerminalBuilder())
+        >>> eote = director.get_eote()
+        >>> eote.train(X_train, y_train)
+        >>> predictions = eote.classify(X_test)
+        >>> eote.classify_and_interpret(X_test.loc[0])
+
+    References:
+        D. L. Aguilar et al., "Towards an interpretable autoencoder: A decision
+        tree-based autoencoder and its application in anomaly detection,"
+        IEEE Transactions on Dependable and Secure Computing, 2022.
+    """
+
     def __init__(self):
+        """Initialize EOTE with empty configuration.
+
+        All components (imputer, encoder, directors, etc.) must be set via
+        Builder pattern before use.
+        """
         self.class_verification_method = None
         self.attribute_remover = None
         self.imputer = None
@@ -36,6 +85,35 @@ class EOTE:
 
 
     def train(self, x: pd.DataFrame, y: pd.Series) -> None:
+        """Train the EOTE model on labeled data.
+
+        Trains one decision tree per feature to predict that feature from all others.
+        The model learns patterns of normal behavior for anomaly detection.
+
+        Args:
+            x: Feature DataFrame with shape (n_samples, n_features).
+               Supports mixed numerical and categorical features.
+               Missing values will be imputed using the configured imputer.
+            y: Target Series with shape (n_samples,). Must contain a single class
+               for semi-supervised anomaly detection (all training samples should
+               be from the "normal" class).
+
+        Raises:
+            ValueError: If the dataset contains multiple classes or if the class
+                       verification method detects invalid data.
+            Exception: If no feature trees can be trained due to insufficient
+                      variability in the features.
+
+        Note:
+            After imputation, decision rules should be interpreted with care as
+            they may reference imputed values rather than original data.
+
+        Example:
+            >>> eote = director.get_eote()
+            >>> X_train = pd.DataFrame({'age': [25, 30, 35], 'income': [50k, 60k, 70k]})
+            >>> y_train = pd.Series(['normal', 'normal', 'normal'])
+            >>> eote.train(X_train, y_train)
+        """
         self.__preprocess_dataset(x, y)
         self.__train_trees()
         self.__check_variability()
@@ -97,6 +175,31 @@ class EOTE:
             raise Exception("Unable to train: Not enough variability of the features")
 
     def classify(self, instances: pd.DataFrame) -> List[List[float]]:
+        """Classify instances as normal or anomalous.
+
+        Calculates anomaly scores for each instance by comparing predicted vs actual
+        feature values across all trained feature trees. Returns numerical scores
+        where positive values indicate anomalies and values near zero indicate normal.
+
+        Args:
+            instances: DataFrame with shape (n_samples, n_features) containing
+                      instances to classify. Must have the same features as training data.
+                      Unknown categorical values will be treated as missing and imputed.
+
+        Returns:
+            List of lists, where each inner list contains a single float anomaly score.
+            - Score > 0: Instance is classified as anomalous
+            - Score ≈ 0: Instance is classified as normal
+            - Higher positive scores indicate stronger anomaly signals
+
+        Raises:
+            ValueError: If the model has not been trained yet.
+
+        Example:
+            >>> scores = eote.classify(X_test)
+            >>> print(scores)
+            [[0.0], [-0.15], [0.82], ...]  # First is normal, third is anomaly
+        """
         self.__check_if_trained()
         instances_known_values = self.__replace_unknown_values(instances)
         instances_encoded = self.__encode_instances(self.imputer.transform(instances_known_values))
@@ -148,6 +251,38 @@ class EOTE:
         return instance.drop(index=feature_columns)
 
     def classify_and_interpret(self, instance: pd.Series) -> None:
+        """Classify a single instance and output human-readable explanation rules.
+
+        Classifies an instance and generates interpretable decision rules explaining
+        why the instance is classified as normal or anomalous. The output is formatted
+        according to the configured output formatter (terminal or file).
+
+        Args:
+            instance: A pandas Series representing a single instance to classify.
+                     Must contain all features from the training data.
+                     Index should be feature names matching training data.
+
+        Raises:
+            ValueError: If the model has not been trained yet.
+
+        Note:
+            This method produces output via the configured output formatter (either
+            to terminal with colors or to a text file). The output includes:
+            - Overall classification (Normal/Anomaly)
+            - Final anomaly score
+            - Decision rules supporting the anomaly classification
+            - Decision rules supporting the normal classification
+
+        Example:
+            >>> eote.classify_and_interpret(X_test.loc[0])
+            # Output (to terminal or file):
+            # Instance: [age=45, income=120000, ...]
+            # Classification: Anomaly (score: 0.82)
+            # Anomaly Rules:
+            #   - If (age > 40) AND (income > 100000) then (status = unemployed)
+            # Normal Rules:
+            #   - If (education ≤ 12) then (credit_score = 650)
+        """
         self.__check_if_trained()
         instance_as_dataframe = instance.to_frame().T.reset_index()
         instance_known_values = self.__replace_unknown_values(instance_as_dataframe)

@@ -1,6 +1,6 @@
 import sys
 sys.path.append(".")
-from EOTE.Ditectors import EOTEDirector
+from EOTE.Directors import EOTEDirector
 from EOTE.Builders import EoteWithMissForestInTxTFileBuilder
 from EOTE.Utils import DataFrameBuilderAff
 
