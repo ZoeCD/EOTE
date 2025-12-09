@@ -4,7 +4,7 @@ from EOTE.Utils import UniqueClassVerifier,\
     InsufficientCategoricalValuesAttributeRemover, \
     MissForestImputer, \
     TxtFileOutputFormatter
-from EOTE.Ditectors import CategoricalFeatureTreeDirector, NumericalFeatureTreeDirector
+from EOTE.Directors import CategoricalFeatureTreeDirector, NumericalFeatureTreeDirector
 from EOTE.Trees import PathShortenerMixedData
 from .categorical_feature_tree_builder import CategoricalFeatureTreeBuilder
 from .numerical_feature_tree_builder import NumericalFeatureTreeBuilder
@@ -12,7 +12,39 @@ from sklearn.preprocessing import OneHotEncoder
 
 
 class EoteWithMissForestInTxTFileBuilder(EOTEBuilder):
+    """Builder for EOTE with MissForest imputation and text file output.
+
+    Configures EOTE with:
+    - MissForest imputation for handling missing data
+    - OneHot encoding for categorical features
+    - Classification trees for categorical features (AUC-based weighting)
+    - Regression trees for numerical features (domain-based scoring)
+    - Text file output for classification results
+
+    This builder uses default hyperparameters suitable for most use cases:
+    - CCP alphas for tree pruning: [0.025, 0.010, 0.005]
+    - Minimum categorical values per attribute: 2 with 3 instances minimum
+    - MissForest with default settings (max_iter=20, tol=0.24)
+
+    Args:
+        output_path: Path to the output text file where classification results
+                    will be written. Defaults to "output.txt".
+
+    Example:
+        >>> from EOTE.Directors import EOTEDirector
+        >>> builder = EoteWithMissForestInTxTFileBuilder("results.txt")
+        >>> director = EOTEDirector(builder)
+        >>> eote = director.get_eote()
+        >>> eote.train(X_train, y_train)
+        >>> eote.classify_and_interpret(X_test.loc[0])  # Writes to results.txt
+    """
+
     def __init__(self, output_path: str = "output.txt"):
+        """Initialize builder with empty EOTE instance and output path.
+
+        Args:
+            output_path: Path where classification results will be written.
+        """
         self.EOTE = EOTE()
         self.output_path = output_path
 

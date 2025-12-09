@@ -4,7 +4,7 @@ from EOTE.Utils import UniqueClassVerifier,\
     InsufficientCategoricalValuesAttributeRemover, \
     MissForestImputer, \
     TerminalOutputFormatter
-from EOTE.Ditectors import CategoricalFeatureTreeDirector, NumericalFeatureTreeDirector
+from EOTE.Directors import CategoricalFeatureTreeDirector, NumericalFeatureTreeDirector
 from EOTE.Trees import PathShortenerMixedData
 from .categorical_feature_tree_builder import CategoricalFeatureTreeBuilder
 from .numerical_feature_tree_builder import NumericalFeatureTreeBuilder
@@ -12,7 +12,30 @@ from sklearn.preprocessing import OneHotEncoder
 
 
 class EoteWithMissForestInTerminalBuilder(EOTEBuilder):
+    """Builder for EOTE with MissForest imputation and terminal output.
+
+    Configures EOTE with:
+    - MissForest imputation for handling missing data
+    - OneHot encoding for categorical features
+    - Classification trees for categorical features (AUC-based weighting)
+    - Regression trees for numerical features (domain-based scoring)
+    - Terminal output with colored formatting
+
+    This builder uses default hyperparameters suitable for most use cases:
+    - CCP alphas for tree pruning: [0.025, 0.010, 0.005]
+    - Minimum categorical values per attribute: 2 with 3 instances minimum
+    - MissForest with default settings (max_iter=20, tol=0.24)
+
+    Example:
+        >>> from EOTE.Directors import EOTEDirector
+        >>> director = EOTEDirector(EoteWithMissForestInTerminalBuilder())
+        >>> eote = director.get_eote()
+        >>> eote.train(X_train, y_train)
+        >>> eote.classify_and_interpret(X_test.loc[0])  # Prints to terminal
+    """
+
     def __init__(self):
+        """Initialize builder with empty EOTE instance."""
         self.Dtae = EOTE()
 
     def set_class_verification_method(self):

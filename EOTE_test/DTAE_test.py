@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 from unittest.mock import Mock
 import pandas as pd
 import numpy as np
-from EOTE.Ditectors import EOTEDirector
+from EOTE.Directors import EOTEDirector
 from EOTE.Builders import EoteWithMissForestInTerminalBuilder
 from EOTE.Utils import DataFrameBuilderAff
 
